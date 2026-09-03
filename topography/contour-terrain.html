@@ -1,0 +1,724 @@
+<title>From Hill to Topo Map</title>
+<meta name="description" content="Flatten a 3-D hill into its contour map with a slider — drawn as a WPA park-poster field sheet." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Jost:ital,wght@0,400;0,500;0,600;1,400&display=swap" />
+<style>
+  /* ---- park-poster tokens (references/design-languages/park-poster.md) ---- */
+  :root {
+    --bg: #F2E4C0;
+    --surface: #F8EFD8;
+    --surface-2: #E5D5AC;
+    --ink: #262E22;
+    --ink-muted: #5C6353;
+    --chart-1: #BF4F26;   /* canyon clay — lead ink */
+    --chart-2: #177A5B;   /* spruce */
+    --chart-3: #9E750F;   /* golden hour */
+    --chart-4: #1D6396;   /* lake blue */
+    --de-emphasis: #C8B98F;
+
+    --font-display: "Oswald", "Arial Narrow", sans-serif;
+    --font-body: "Jost", system-ui, -apple-system, sans-serif;
+
+    --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 40px; --space-5: 64px;
+
+    /* names the three.js code reads back via getComputedStyle */
+    --paper: #F2E4C0;
+    --panel: #E5D5AC;
+    --contour: #262E22;
+    --contour-strong: #BF4F26;
+    --accent: #1D6396;
+    --hair: #C8B98F;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* the poster frame — one flat ink border, tight to the edge, growing
+     with the sheet so it wraps the whole thing on a scrolling page */
+  .poster {
+    border: 12px solid var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ---- title band (mandatory world-building) ---- */
+  .band {
+    position: relative;
+    overflow: hidden;
+    background: var(--chart-1);
+    color: var(--surface);
+    padding: clamp(22px, 4vw, 46px) clamp(16px, 3vw, 40px) clamp(20px, 3.4vw, 38px);
+  }
+  .band > :not(.sun) { position: relative; z-index: 1; }
+  .sun { position: absolute; right: -46px; top: -54px; width: clamp(150px, 22vw, 240px); opacity: 0.5; z-index: 0; }
+
+  .band-inner { max-width: 1180px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 12px;
+    color: var(--surface);
+    opacity: 0.82;
+    margin: 0 0 10px;
+  }
+  .h1wrap { position: relative; display: inline-block; }
+  .h1wrap h1, .h1wrap .echo {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(30px, 5.6vw, 54px);
+    line-height: 1.03;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .h1wrap h1 { position: relative; z-index: 1; color: var(--surface); }
+  .h1wrap .echo {
+    position: absolute; left: 0; top: 0;
+    z-index: 0;
+    color: #8F3A1C;                 /* one plane printed off-register */
+    transform: translate(3px, 4px);
+    pointer-events: none;
+  }
+  .rule { width: 120px; height: 2px; background: var(--surface); margin: 14px 0 12px; transform-origin: left; }
+  .band p.lede {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--surface);
+    opacity: 0.92;
+    font-size: 15px;
+  }
+
+  /* ---- work area ---- */
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 36px);
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    grid-template-areas: "stage rail";
+    gap: clamp(16px, 2.4vw, 30px);
+  }
+  .stage { grid-area: stage; display: flex; flex-direction: column; gap: 12px; }
+  .rail { grid-area: rail; display: flex; flex-direction: column; gap: 22px; }
+
+  .viewport {
+    position: relative;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    aspect-ratio: 16 / 11;
+    overflow: hidden;
+  }
+  .viewport canvas { display: block; width: 100%; height: 100%; }
+
+  /* screen-print grain, plus one off-register plane inside the scene */
+  .grain {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0.16;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .probe {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    border: 1px solid var(--ink);
+    padding: 5px 9px;
+    color: var(--ink-muted);
+  }
+  .probe b { color: var(--ink); font-weight: 600; }
+  .hint {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    opacity: 0.8;
+  }
+
+  .caption {
+    border-left: 3px solid var(--chart-1);
+    padding: 4px 0 4px 14px;
+    min-height: 52px;
+    font-size: 14.5px;
+  }
+  .caption b { font-weight: 600; }
+
+  .card {
+    background: var(--surface-2);
+    border: 1.5px solid var(--ink);
+    padding: 16px;
+  }
+  .card h2 {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    margin: 0 0 12px;
+  }
+
+  .flatten-val {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .flatten-val span { font-size: 13px; color: var(--ink-muted); font-family: var(--font-body); letter-spacing: 0; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--de-emphasis);
+    margin: 14px 0 4px;
+    outline-offset: 4px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px; height: 18px;
+    background: var(--chart-1);
+    border: 3px solid var(--bg);
+    cursor: grab;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 0;
+    background: var(--chart-1);
+    border: 3px solid var(--bg);
+    cursor: grab;
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--chart-4); outline-offset: 2px; }
+  .ends {
+    display: flex; justify-content: space-between;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-muted);
+  }
+
+  .toggles { display: flex; flex-direction: column; gap: 10px; }
+  .toggle {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13.5px; cursor: pointer;
+  }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .box {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--ink-muted);
+    display: grid; place-items: center;
+    flex: none;
+  }
+  .box::after { content: ""; width: 8px; height: 8px; background: var(--chart-1); transform: scale(0); transition: transform 0.12s; }
+  .toggle input:checked + .box { border-color: var(--chart-1); }
+  .toggle input:checked + .box::after { transform: scale(1); }
+  .toggle input:focus-visible + .box { outline: 2px solid var(--chart-4); outline-offset: 2px; }
+
+  .legend { display: flex; flex-direction: column; gap: 1px; margin-top: 14px; max-height: 300px; overflow-y: auto; }
+  .legend-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 6px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-muted);
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .legend-row:hover, .legend-row.active {
+    background: color-mix(in srgb, var(--chart-4) 14%, transparent);
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--chart-4) 40%, transparent);
+  }
+  .swatch { width: 22px; height: 10px; flex: none; border: 1px solid var(--ink); }
+  .legend-note { margin: 10px 0 0; font-size: 11.5px; color: var(--ink-muted); line-height: 1.45; }
+
+  /* ---- ranger footer ---- */
+  .ranger {
+    background: var(--ink);
+    color: var(--surface-2);
+    font: 400 12px/1.4 var(--font-body);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    text-align: center;
+    padding: 14px 16px;
+  }
+
+  /* ============ motion layer ============
+     park-poster build: the sheet assembles as SCREEN-PRINT PASSES, back to
+     front — decisive flat arrivals, no bounce (references/motion.md).
+     Band prints first, then its lettering, then the map viewport as one
+     pass, its caption, the three field cards, and the ranger strip last.
+     from-only keyframes -> fill-mode backwards, so the finished frame
+     carries no active animation. */
+  @media (prefers-reduced-motion: no-preference) {
+    .a-print  { animation: print  .55s cubic-bezier(.2,.8,.2,1) var(--dl,0s) backwards; }
+    .a-fadein { animation: fadein .5s  ease-out                  var(--dl,0s) backwards; }
+    .a-rise   { animation: rise   .55s cubic-bezier(.2,.8,.2,1) var(--dl,0s) backwards; }
+    .a-wipe   { animation: wipe   .8s  cubic-bezier(.2,.8,.2,1) var(--dl,0s) backwards; }
+  }
+  @keyframes print  { from { opacity: 0; transform: translateY(-12px); } }
+  @keyframes fadein { from { opacity: 0; } }
+  @keyframes rise   { from { opacity: 0; transform: translateY(12px); } }
+  @keyframes wipe   { from { transform: scaleX(0); } }
+
+  @media (max-width: 880px) {
+    .app { grid-template-columns: 1fr; grid-template-areas: "stage" "rail"; }
+    .viewport { aspect-ratio: 3 / 2; }
+  }
+</style>
+
+<div class="poster">
+<header class="band a-fadein">
+  <svg class="sun a-fadein" style="--dl:.5s" width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
+    <circle cx="120" cy="120" r="114" fill="#D98A5F" />
+    <circle cx="120" cy="120" r="84" fill="#CC6A3C" />
+    <circle cx="120" cy="120" r="52" fill="#9E750F" />
+  </svg>
+  <div class="band-inner">
+    <p class="eyebrow a-rise" style="--dl:.3s">Field guide to the land &middot; Sheet No. 3</p>
+    <div class="h1wrap a-rise" style="--dl:.45s">
+      <p class="echo" aria-hidden="true">From Hill to Topo Map</p>
+      <h1>From Hill to Topo Map</h1>
+    </div>
+    <div class="rule a-wipe" style="--dl:.7s"></div>
+    <p class="lede a-rise" style="--dl:.85s">A contour line joins points of equal elevation. Slide the twin-peaked hill flat and watch the loops settle onto the paper as the map a surveyor would draw &mdash; including the saddle where one ring wraps both summits.</p>
+  </div>
+</header>
+
+<div class="app">
+  <div class="stage">
+    <div class="viewport a-print" style="--dl:1.05s">
+      <canvas id="c"></canvas>
+      <svg class="grain" aria-hidden="true">
+        <filter id="tg"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" /><feColorMatrix type="matrix" values="0 0 0 0 0.15 0 0 0 0 0.13 0 0 0 0 0.09 0 0 0 0.5 0" /></filter>
+        <rect width="100%" height="100%" filter="url(#tg)" />
+      </svg>
+      <div class="hint">drag to orbit</div>
+      <div class="probe" id="probe">point at the slope &rarr; <b>&mdash;</b></div>
+    </div>
+    <p class="caption a-fadein" style="--dl:1.6s" id="caption"></p>
+  </div>
+
+  <aside class="rail">
+    <div class="card a-rise" style="--dl:1.85s">
+      <h2>Flatten</h2>
+      <div class="flatten-val"><span id="flattenPct">0</span><span>&thinsp;% flat</span></div>
+      <input type="range" id="flatten" min="0" max="1" step="0.001" value="0" aria-label="Flatten the hill" />
+      <div class="ends"><span>3-D hill</span><span>2-D map</span></div>
+    </div>
+
+    <div class="card a-rise" style="--dl:2s">
+      <h2>Layers</h2>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="tLines" checked /><span class="box"></span>Contour lines</label>
+        <label class="toggle"><input type="checkbox" id="tTint" checked /><span class="box"></span>Elevation tint</label>
+        <label class="toggle"><input type="checkbox" id="tSpin" /><span class="box"></span>Auto-rotate</label>
+      </div>
+    </div>
+
+    <div class="card a-rise" style="--dl:2.15s">
+      <h2>Contour interval &mdash; <span id="intervalLabel">30 m</span></h2>
+      <input type="range" id="interval" min="10" max="80" step="5" value="30" aria-label="Contour interval in metres" />
+      <div class="ends"><span>10 m &middot; dense</span><span>80 m &middot; sparse</span></div>
+      <div class="legend" id="legend"></div>
+      <p class="legend-note">Smaller interval = more lines = finer detail (and steep ground turns to ink). Hover a band to trace that one line. Even spacing &rarr; even slope; bunched lines &rarr; a cliff.</p>
+    </div>
+  </aside>
+</div>
+
+<footer class="ranger a-fadein" style="--dl:2.5s">Topographic Field Station &middot; terrain is an illustrative model &middot; heavier lines are index contours, every 5th</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- terrain model -------------------------------------------------
+  var HALF = 5.5;          // world half-width
+  var M2U = 100;           // metres per world unit
+  // two overlapping gaussians -> two summits with a saddle (pass) between
+  var PEAKS = [
+    { x: -2.0, y: -0.2, a: 2.9, s: 1.2 },
+    { x:  2.1, y:  0.3, a: 2.6, s: 1.25 }
+  ];
+  function height(x, y) {
+    var h = 0;
+    for (var p = 0; p < PEAKS.length; p++) {
+      var k = PEAKS[p], dx = x - k.x, dy = y - k.y;
+      h += k.a * Math.exp(-(dx * dx + dy * dy) / (2 * k.s * k.s));
+    }
+    return h;
+  }
+  // sample the tallest point so ramp / labels / camera scale to it
+  var MAXH = 0;
+  for (var sy = -HALF; sy <= HALF; sy += 0.1)
+    for (var sx = -HALF; sx <= HALF; sx += 0.1)
+      MAXH = Math.max(MAXH, height(sx, sy));
+
+  var intervalM = 30;                 // contour interval, metres (user-set)
+  var LEVELS = [];
+  function buildLevels() {
+    LEVELS = [];
+    var step = intervalM / M2U;
+    for (var L = step; L < MAXH - 0.015; L += step) LEVELS.push(L);
+  }
+  buildLevels();
+
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  // hypsometric ramp in park-poster inks: spruce -> golden -> clay -> paper
+  var RAMP = [
+    [0.00, [0x2f, 0x6b, 0x4c]],
+    [0.34, [0x9e, 0x75, 0x0f]],
+    [0.60, [0xbf, 0x4f, 0x26]],
+    [0.80, [0xd9, 0x8a, 0x5f]],
+    [1.00, [0xf3, 0xe4, 0xc0]]
+  ];
+  function ramp(t) {
+    t = Math.max(0, Math.min(1, t));
+    for (var i = 1; i < RAMP.length; i++) {
+      if (t <= RAMP[i][0]) {
+        var a = RAMP[i - 1], b = RAMP[i];
+        var f = (t - a[0]) / (b[0] - a[0]);
+        return [
+          (a[1][0] + f * (b[1][0] - a[1][0])) / 255,
+          (a[1][1] + f * (b[1][1] - a[1][1])) / 255,
+          (a[1][2] + f * (b[1][2] - a[1][2])) / 255
+        ];
+      }
+    }
+    return [1, 1, 1];
+  }
+
+  // ---- three.js setup ----------------------------------------------
+  var canvas = document.getElementById("c");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+  var target = new THREE.Vector3(0, 0, MAXH * 0.42);
+
+  scene.add(new THREE.HemisphereLight(0xfff4dd, 0x6b5c48, 0.7));
+  var sun = new THREE.DirectionalLight(0xfff0d8, 0.75);
+  sun.position.set(-6, -9, 12);
+  scene.add(sun);
+
+  // surface mesh (PlaneGeometry lies in XY, +Z up)
+  var N = 150;
+  var geo = new THREE.PlaneGeometry(HALF * 2, HALF * 2, N, N);
+  var pos = geo.attributes.position;
+  var colors = new Float32Array(pos.count * 3);
+  for (var v = 0; v < pos.count; v++) {
+    var x = pos.getX(v), y = pos.getY(v);
+    var h = height(x, y);
+    pos.setZ(v, h);
+    var c = ramp(h / MAXH);
+    colors[v * 3] = c[0]; colors[v * 3 + 1] = c[1]; colors[v * 3 + 2] = c[2];
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  var mat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 1.0, metalness: 0.0,
+    polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2
+  });
+  var surface = new THREE.Mesh(geo, mat);
+  scene.add(surface);
+
+  var flatMat = new THREE.MeshStandardMaterial({ color: 0xe5d5ac, roughness: 1 });
+
+  // base plane (the "paper")
+  var paper = new THREE.Mesh(
+    new THREE.PlaneGeometry(HALF * 2, HALF * 2),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.04 })
+  );
+  paper.position.z = -0.002;
+  scene.add(paper);
+
+  // ---- marching squares contour extraction ------------------------
+  var MS = [[], [[3,0]], [[0,1]], [[3,1]], [[1,2]], [[3,0],[1,2]], [[0,2]], [[3,2]],
+            [[2,3]], [[2,0]], [[0,1],[2,3]], [[2,1]], [[1,3]], [[1,0]], [[0,3]], []];
+  function contourSegments(level) {
+    var G = 200, seg = [];
+    var step = (HALF * 2) / G;
+    function edgePt(e, x0, y0, x1, y1, v0, v1, v2, v3) {
+      var f;
+      if (e === 0) { f = (level - v0) / (v1 - v0); return [x0 + f * step, y0]; }
+      if (e === 1) { f = (level - v1) / (v2 - v1); return [x1, y0 + f * step]; }
+      if (e === 2) { f = (level - v3) / (v2 - v3); return [x0 + f * step, y1]; }
+      f = (level - v0) / (v3 - v0); return [x0, y0 + f * step];
+    }
+    for (var j = 0; j < G; j++) {
+      var y0 = -HALF + j * step, y1 = y0 + step;
+      for (var i = 0; i < G; i++) {
+        var x0 = -HALF + i * step, x1 = x0 + step;
+        var v0 = height(x0, y0), v1 = height(x1, y0), v2 = height(x1, y1), v3 = height(x0, y1);
+        var idx = (v0 > level ? 1 : 0) | (v1 > level ? 2 : 0) | (v2 > level ? 4 : 0) | (v3 > level ? 8 : 0);
+        var lines = MS[idx];
+        for (var k = 0; k < lines.length; k++) {
+          var p = edgePt(lines[k][0], x0, y0, x1, y1, v0, v1, v2, v3);
+          var q = edgePt(lines[k][1], x0, y0, x1, y1, v0, v1, v2, v3);
+          seg.push(p[0], p[1], level, q[0], q[1], level);
+        }
+      }
+    }
+    return new Float32Array(seg);
+  }
+
+  var linesGroup = new THREE.Group();
+  scene.add(linesGroup);
+  var levelLines = [];
+  function rebuildContours() {
+    for (var i = 0; i < levelLines.length; i++) {
+      linesGroup.remove(levelLines[i]);
+      levelLines[i].geometry.dispose();
+      levelLines[i].material.dispose();
+    }
+    levelLines = LEVELS.map(function (lv) {
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(contourSegments(lv), 3));
+      var m = new THREE.LineBasicMaterial({ transparent: true });
+      var ls = new THREE.LineSegments(g, m);
+      ls.renderOrder = 2;
+      linesGroup.add(ls);
+      return ls;
+    });
+  }
+  // every 5th line is an "index contour" (heavier), as on real maps
+  function isIndex(i) { return (i + 1) % 5 === 0; }
+  rebuildContours();
+
+  // cursor marker
+  var marker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0x1d6396 })
+  );
+  marker.visible = false;
+  scene.add(marker);
+
+  // ---- scale figure: a flat ink hiker on the outer slope, gazing at the
+  //      summits (park-poster signature device — makes the vista vast) ----
+  var figure = new THREE.Group();
+  (function () {
+    var ink = new THREE.MeshBasicMaterial({ color: 0x262e22 });
+    var body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.17), ink);
+    body.position.z = 0.085;
+    var head = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), ink);
+    head.position.z = 0.205;
+    var pack = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), ink);
+    pack.position.set(0, -0.05, 0.11);
+    figure.add(body, head, pack);
+  })();
+  var FIGX = -3.5, FIGY = -0.2;
+  var figH = height(FIGX, FIGY);
+  figure.position.set(FIGX, FIGY, figH);
+  figure.renderOrder = 3;
+  scene.add(figure);
+
+  // ---- theme-driven colors ---------------------------------------
+  function applyTheme() {
+    renderer.setClearColor(new THREE.Color(css("--paper")), 1);
+    var base = new THREE.Color(css("--contour"));
+    var strong = new THREE.Color(css("--contour-strong"));
+    var accent = new THREE.Color(css("--accent"));
+    marker.material.color.copy(accent);
+    for (var i = 0; i < levelLines.length; i++) {
+      var m = levelLines[i].material;
+      if (i === hoverLevel) { m.color.copy(accent); m.opacity = 1; }
+      else if (hoverLevel >= 0) { m.color.copy(base); m.opacity = 0.22; }
+      else { m.color.copy(isIndex(i) ? strong : base); m.opacity = isIndex(i) ? 1 : 0.8; }
+    }
+  }
+
+  // ---- interaction state ---------------------------------------
+  var targetT = 0, curT = 0;
+  var az = -0.35, azTarget = -0.35;
+  var spin = false, hoverLevel = -1;
+  var dragging = false, lastX = 0, moved = false;
+
+  function polarFromT(t) { return 1.22 - t * 1.16; } // radians from +Z axis-ish
+
+  function updateCamera() {
+    var polar = polarFromT(curT);
+    var r = 12.8 + curT * 6;
+    target.z = MAXH * 0.46 * (1 - curT);
+    if (curT > 0.9 && !dragging && !spin) azTarget += (0 - azTarget) * (curT - 0.9) * 0.5;
+    var sp = Math.sin(polar), cp = Math.cos(polar);
+    camera.position.set(
+      target.x + r * sp * Math.sin(az),
+      target.y - r * sp * Math.cos(az),
+      target.z + r * cp + 0.3
+    );
+    camera.up.set(0, 0, 1);
+    camera.lookAt(target);
+  }
+
+  // ---- resize --------------------------------------------------
+  function resize() {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+
+  // ---- raycast probe ------------------------------------------
+  var ray = new THREE.Raycaster();
+  var ndc = new THREE.Vector2();
+  var probeEl = document.getElementById("probe");
+  function probe(ev) {
+    if (dragging) return;
+    var rect = canvas.getBoundingClientRect();
+    ndc.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    ray.setFromCamera(ndc, camera);
+    var hit = ray.intersectObject(surface)[0];
+    if (!hit) { marker.visible = false; probeEl.innerHTML = "point at the slope &rarr; <b>&mdash;</b>"; return; }
+    var hx = hit.point.x, hy = hit.point.y;
+    var elev = height(hx, hy);
+    marker.position.set(hx, hy, elev * (1 - curT) + 0.02);
+    marker.visible = true;
+    probeEl.innerHTML = "elevation here &rarr; <b>" + Math.round(elev * M2U / 5) * 5 + " m</b>";
+  }
+  canvas.addEventListener("pointermove", probe);
+  canvas.addEventListener("pointerleave", function () { marker.visible = false; });
+
+  // ---- orbit drag -------------------------------------------
+  canvas.addEventListener("pointerdown", function (e) {
+    dragging = true; moved = false; lastX = e.clientX;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var dx = e.clientX - lastX; lastX = e.clientX;
+    if (Math.abs(dx) > 1) moved = true;
+    azTarget += dx * 0.008;
+    az = azTarget;
+  });
+  canvas.addEventListener("pointerup", function (e) {
+    dragging = false;
+    canvas.releasePointerCapture(e.pointerId);
+  });
+
+  // ---- controls ---------------------------------------------
+  var flat = document.getElementById("flatten");
+  var flatPct = document.getElementById("flattenPct");
+  var captionEl = document.getElementById("caption");
+  function caption() {
+    var t = curT, s;
+    if (t < 0.04) s = "<b>Full relief.</b> Two summits joined by a low saddle. Each stacked loop rides the surface at one fixed height &mdash; the loops never tilt, the ground does.";
+    else if (t < 0.45) s = "<b>Tilting toward plan view.</b> The surface is sinking but every contour holds its elevation, so they slide apart from each peak outward.";
+    else if (t < 0.92) s = "<b>Nearly flat.</b> Low loops wrap both hills as one; higher loops split in two. The waist between them is the <b>saddle</b> &mdash; the pass across the ridge.";
+    else s = "<b>Topographic map.</b> Two nests of closed rings = two summits. A figure-eight pinch between them = the saddle. Heavier lines are index contours (every 5th).";
+    captionEl.innerHTML = s;
+  }
+  flat.addEventListener("input", function () {
+    targetT = parseFloat(flat.value);
+    if (reduce) curT = targetT;
+  });
+  document.getElementById("tLines").addEventListener("change", function (e) {
+    linesGroup.visible = e.target.checked;
+  });
+  document.getElementById("tTint").addEventListener("change", function (e) {
+    surface.material = e.target.checked ? mat : flatMat;
+  });
+  document.getElementById("tSpin").addEventListener("change", function (e) {
+    spin = e.target.checked;
+  });
+
+  // ---- legend ---------------------------------------------
+  var legendEl = document.getElementById("legend");
+  function rebuildLegend() {
+    legendEl.innerHTML = "";
+    for (var n = LEVELS.length - 1; n >= 0; n--) {
+      (function (i) {
+        var lv = LEVELS[i];
+        var row = document.createElement("div");
+        row.className = "legend-row";
+        var c = ramp(lv / MAXH).map(function (v) { return Math.round(v * 255); });
+        row.innerHTML = '<span class="swatch" style="background:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')"></span>' +
+          '<span' + (isIndex(i) ? ' style="color:var(--ink);font-weight:600"' : '') + '>' +
+          Math.round(lv * M2U) + " m</span>";
+        row.addEventListener("pointerenter", function () { hoverLevel = i; row.classList.add("active"); applyTheme(); });
+        row.addEventListener("pointerleave", function () { hoverLevel = -1; row.classList.remove("active"); applyTheme(); });
+        legendEl.appendChild(row);
+      })(n);
+    }
+  }
+  rebuildLegend();
+
+  // ---- contour interval control --------------------------
+  var ivEl = document.getElementById("interval");
+  var ivLabel = document.getElementById("intervalLabel");
+  function setInterval_(m) {
+    intervalM = m;
+    ivLabel.textContent = m + " m";
+    hoverLevel = -1;
+    buildLevels();
+    rebuildContours();
+    rebuildLegend();
+    applyTheme();
+  }
+  ivEl.addEventListener("input", function () { setInterval_(parseInt(ivEl.value, 10)); });
+  setInterval_(30);
+
+  // ---- loop --------------------------------------------
+  function frame() {
+    curT += (targetT - curT) * (reduce ? 1 : 0.12);
+    if (Math.abs(targetT - curT) < 0.0005) curT = targetT;
+    if (spin && curT < 0.995) { azTarget += 0.0045; az = azTarget; }
+    else az += (azTarget - az) * 0.15;
+
+    var sz = 1 - curT;
+    surface.scale.z = Math.max(sz, 0.0001);
+    linesGroup.scale.z = Math.max(sz, 0.0001);
+
+    figure.position.z = figH * sz;
+    figure.rotation.z = az;
+    figure.visible = curT < 0.985;
+
+    flatPct.textContent = Math.round(curT * 100);
+    caption();
+    updateCamera();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  applyTheme();
+  updateCamera();
+  frame();
+})();
+</script>

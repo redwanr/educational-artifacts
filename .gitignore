@@ -1,0 +1,31 @@
+# ---- OS / editor junk ----
+.DS_Store
+*.swp
+
+# ---- Claude Code workspace, not part of the site ----
+.claude/
+.playwright-mcp/
+shot-dish.png
+
+# ---- Reference material bundled with the epic-infographics skill ----
+# 79 MB of other people's renders. Not original work, no reason to publish.
+examples/
+
+# ---- Third-party source documents ----
+# METR's incident report. Copyrighted by METR; swarm.html links to metr.org instead.
+*.pdf
+
+# ---- Build inputs, not build outputs ----
+# sf-hills.html has the sampled elevation data baked in already.
+topography/build/dem.json
+
+# ---- Private working notes ----
+# Local context and prompts. Not part of the site.
+CLAUDE.md
+beast-lessons/CLAUDE.md
+topography/CONTEXT.md
+topography/contour-artifact-prompt.md
+
+# ---- Private, do not publish ----
+# Personal material. Read beast-lessons/CLAUDE.md before changing this line.
+beast-lessons/

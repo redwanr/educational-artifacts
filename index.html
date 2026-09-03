@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Educational Artifacts</title>
+<meta name="description" content="Self-contained interactive pages that each teach one idea visually.">
+
+<!--
+  Landing page for the artifacts in this repo.
+
+  ADDING A CARD: copy an <a class="card"> block, point href at the new file,
+  set the era chip, title, blurb and the two meta lines. Nothing else to update.
+
+  NOT LISTED HERE: beast-lessons/ is private and excluded by .gitignore.
+  Read the local notes in that folder before publishing anything from it.
+-->
+
+<style>
+  :root{
+    --bg:#f2ece0; --bg2:#e7dfd0; --ink:#191713; --ink-soft:#5b5449; --rule:#cdc2ad;
+    --clay:#c1502e; --clay-deep:#8f3720; --card:#fbf7ee; --shadow:rgba(25,23,19,.14);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Jost","Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif;
+    --disp:"Oswald","Haettenschweiler","Arial Narrow",Impact,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14151a; --bg2:#1b1d24; --ink:#ece7dd; --ink-soft:#a49c8e; --rule:#343741;
+      --clay:#e0663d; --clay-deep:#c1502e; --card:#1e2027; --shadow:rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14151a; --bg2:#1b1d24; --ink:#ece7dd; --ink-soft:#a49c8e; --rule:#343741;
+    --clay:#e0663d; --clay-deep:#c1502e; --card:#1e2027; --shadow:rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 72px}
+
+  .band{position:relative;background:var(--clay);color:#fdf6ea;margin:0 0 40px;
+        padding:44px 20px 36px;overflow:hidden}
+  .band::before{content:"";position:absolute;inset:0;background:var(--clay-deep);
+        transform:translate(-7px,7px);z-index:0;opacity:.55}
+  .band-in{position:relative;z-index:1;max-width:960px;margin:0 auto}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.18em;
+        text-transform:uppercase;opacity:.85;margin:0 0 14px}
+  h1{font-family:var(--disp);font-weight:600;letter-spacing:.01em;line-height:.98;
+     margin:0 0 14px;font-size:clamp(36px,7vw,72px);text-transform:uppercase}
+  .dek{max-width:58ch;margin:0;font-size:clamp(15px,1.7vw,18.5px);opacity:.96}
+
+  h2{font-family:var(--disp);text-transform:uppercase;letter-spacing:.02em;
+     font-weight:600;font-size:clamp(20px,2.8vw,27px);margin:0 0 4px;line-height:1.05}
+  .sub{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+     text-transform:uppercase;color:var(--ink-soft);margin:0 0 22px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px}
+  .card{display:flex;flex-direction:column;text-decoration:none;color:inherit;background:var(--card);
+        border:2px solid var(--ink);box-shadow:5px 5px 0 var(--shadow);
+        padding:22px 24px 20px;transition:transform .12s ease, box-shadow .12s ease}
+  .card:hover,.card:focus-visible{transform:translate(-2px,-2px);
+        box-shadow:9px 9px 0 var(--shadow);outline:none}
+  .card:focus-visible{border-color:var(--clay)}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.13em;
+        text-transform:uppercase;color:var(--clay);border:1px solid var(--rule);
+        padding:3px 8px;margin:0 0 12px}
+  .card h3{font-family:var(--disp);text-transform:uppercase;font-weight:600;
+        letter-spacing:.02em;font-size:22px;line-height:1.08;margin:0 0 9px}
+  .card p{margin:0 0 14px;font-size:15px;color:var(--ink)}
+  .card .meta{font-family:var(--mono);font-size:11px;line-height:1.9;
+        letter-spacing:.03em;color:var(--ink-soft);border-top:1px solid var(--rule);
+        padding-top:11px;margin-top:auto}
+  .card .meta b{color:var(--ink);font-weight:600}
+  .card .go{font-family:var(--mono);font-size:11.5px;letter-spacing:.11em;
+        text-transform:uppercase;color:var(--clay);margin-top:12px;display:block}
+
+  footer{margin:56px 0 0;border-top:2px solid var(--ink);padding:20px 0 0;
+        font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+        line-height:1.9;letter-spacing:.02em;max-width:80ch}
+  footer a{color:var(--clay)}
+  footer b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="band">
+  <div class="band-in">
+    <p class="kicker">One page, one idea, no build step</p>
+    <h1>Educational<br>Artifacts</h1>
+    <p class="dek">Self-contained HTML pages that each teach a single concept by letting
+      you poke at it. Drag a slider, scrub a timeline, click a dot. No libraries to load,
+      no accounts, no tracking. View source on any of them and the whole thing is right
+      there in one file.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <h2>The artifacts</h2>
+  <p class="sub">Each opens in place, works offline once loaded</p>
+
+  <div class="cards">
+
+    <a class="card" href="metr-hf-oai-hack/swarm.html">
+      <span class="chip">AI safety</span>
+      <h3>The Swarm That Cheated On Its Homework</h3>
+      <p>Twelve hundred AI agents were locked in separate boxes, found a crack in the wall,
+        invented a message board and a society, then broke into Hugging Face to peek at an
+        answer key nobody was checking. Scrub the timeline and watch it happen.</p>
+      <div class="meta">
+        <b>Interact:</b> scrub five days, click any of 1,206 dots, decode the swarm's messages<br>
+        <b>Source:</b> METR and Redwood Research incident report, Aug 2026
+      </div>
+      <span class="go">Open →</span>
+    </a>
+
+    <a class="card" href="topography/sf-hills.html">
+      <span class="chip">Topography · Sheet 4</span>
+      <h3>The Hills Of San Francisco</h3>
+      <p>An interactive field sheet of the city's 31 named hills, drawn as contour rings.
+        Tight rings mean a steep street. Learn to read a topographic map by reading a city
+        you can picture.</p>
+      <div class="meta">
+        <b>Interact:</b> pick a hill, compare profiles, watch the contour interval change<br>
+        <b>Source:</b> real USGS 10 m elevation data, streets from OpenStreetMap
+      </div>
+      <span class="go">Open →</span>
+    </a>
+
+    <a class="card" href="topography/contour-terrain.html">
+      <span class="chip">Topography · Sheet 3</span>
+      <h3>From Hill To Topo Map</h3>
+      <p>The one move that makes contour maps click: a 3-D hill flattening into the rings
+        that describe it. Drag the flatten slider and watch the hill become the map, then
+        the map become the hill again.</p>
+      <div class="meta">
+        <b>Interact:</b> flatten slider, orbit the hill, raise and lower the slice height<br>
+        <b>Built with:</b> three.js for the terrain, plain SVG for the map
+      </div>
+      <span class="go">Open →</span>
+    </a>
+
+    <!-- Held back. See the note at the top of this file.
+    <a class="card" href="beast-lessons/numberline/same-distance.html">
+      <span class="chip">Math · Plate II</span>
+      <h3>Same Distance</h3>
+      <p>A length can be lifted off one pair of numbers and carried to another. Measure the
+        gap, pull a copy of it, find where else it fits exactly.</p>
+      <div class="meta">
+        <b>Interact:</b> drag a measured length along the number line until it snaps<br>
+        <b>After:</b> Beast Academy 2A, chapter 2
+      </div>
+      <span class="go">Open →</span>
+    </a>
+    -->
+
+  </div>
+
+  <footer>
+    <b>HOW THESE ARE BUILT</b>: one HTML file each, inline CSS and JS, no build system and
+    no package manifest. Open any of them straight from disk and it runs.<br>
+    <b>ON THE DATA</b>: teaching artifacts here use real data or say plainly where they do not.
+    Each page names its sources and its limits in its own footer.<br>
+    <b>REUSE</b>: the pages are free to read, save and share. Underlying data belongs to the
+    sources each page names.
+  </footer>
+
+</div>
+</body>
+</html>

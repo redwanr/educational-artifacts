@@ -29,3 +29,5 @@ topography/contour-artifact-prompt.md
 # ---- Private, do not publish ----
 # Personal material. Read beast-lessons/CLAUDE.md before changing this line.
 beast-lessons/
+# Separate private repo with its own .git.
+soriyah-calendar/
